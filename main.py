@@ -34,8 +34,8 @@ if __name__ == "__main__":
     valset.dataset.transform = transform_test
 
     trainloader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-    valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-    labels = pd.Series(torch.concat([y for _,y in valloader], dim=0))
-    print(labels.value_counts())
+
+
