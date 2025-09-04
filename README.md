@@ -70,3 +70,44 @@ Cada imagen tiene 3 canales (RGB) y 32 pixeles de ancho y alto. El `Compose` con
 ![Muestra 1](./images/muestra1.png)
 ![Muestra 2](./images/muestra2.png)
 ![Muestra 3](./images/muestra3.png)
+
+
+# Targets y su distribucion
+
+Oficialmente, estas son las clases de cifar10:
+
+| Etiqueta | Clase       | Descripción breve                         |
+|---------:|-------------|-------------------------------------------|
+| 0        | airplane     | Aviones de todo tipo                     |
+| 1        | automobile   | Autos (no incluye camiones)              |
+| 2        | bird         | Aves en distintas posiciones             |
+| 3        | cat          | Gatos domésticos                         |
+| 4        | deer         | Ciervos, venados                         |
+| 5        | dog          | Perros de varias razas                   |
+| 6        | frog         | Ranas, generalmente en primer plano      |
+| 7        | horse        | Caballos                                 |
+| 8        | ship         | Barcos, embarcaciones                    |
+| 9        | truck        | Camiones, vehículos de carga             |
+
+Para revisar la distribucion de los targets se implemento el siguiente codigo:
+
+```python
+
+    all_labels = pd.Series(torch.cat([y for _, y in trainloader], dim=0))
+    print(all_labels.value_counts())
+```
+
+Recibimos el siguiente resultado:
+
+```
+2    5000
+7    5000
+3    5000
+6    5000
+1    5000
+4    5000
+0    5000
+5    5000
+8    5000
+9    5000
+```
