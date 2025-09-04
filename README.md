@@ -56,4 +56,17 @@ if __name__ == "__main__":
 
 ```
 
+Luego, vimos el shape de cada uno de los registros de entrenamiento:
 
+
+```
+torch.Size([128, 3, 32, 32])
+torch.Size([128])
+```
+
+Cada imagen tiene 3 canales (RGB) y 32 pixeles de ancho y alto. El `Compose` convierte las imagenes retornadas por la clase CIFAR10 en tensores directamente, sin embargo, las podemos visualizar, estas son 3 muestras del conjunto de imagenes.
+
+
+![Muestra 1](./images/muestra1.png)
+![Muestra 2](./images/muestra2.png)
+![Muestra 3](./images/muestra3.png)

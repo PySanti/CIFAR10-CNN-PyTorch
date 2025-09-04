@@ -2,6 +2,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from utils.MACROS import NUM_WORKERS, BATCH_SIZE
+from utils.show_cifar_image import show_tensor_image
 
 
 if __name__ == "__main__":
@@ -25,5 +26,4 @@ if __name__ == "__main__":
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
     for i, (X_batch, Y_batch) in enumerate(trainloader):
-        print(X_batch.shape)
-        print(Y_batch.shape)
+        show_tensor_image(X_batch[0])
