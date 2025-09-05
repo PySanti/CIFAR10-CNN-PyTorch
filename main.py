@@ -8,6 +8,7 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from utils.MACROS import NUM_WORKERS, BATCH_SIZE
 from utils.PlainCNN import PlainCNN
+from utils.InceptionNet import InceptionNet
 from utils.plot_performance import plot_performance
 
 if __name__ == "__main__":
@@ -42,10 +43,10 @@ if __name__ == "__main__":
     valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
 
-    cnn = PlainCNN(3).to('cuda')
+    inception = InceptionNet(3).to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-2, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(params=inception.parameters(), lr=1e-3, weight_decay=1e-4)
     epoch_train_loss = []
     epoch_val_loss = []
 
@@ -57,9 +58,9 @@ if __name__ == "__main__":
         val_loss = []
 
         t1 = time.time()
-        cnn.train()
+        inception.train()
 
-        if (i+1)%15 == 0:
+        if (i+1)%20 == 0:
             optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']*0.1
             print(f"Valor actual del lr : {optimizer.param_groups[0]['lr']}")
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
             X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
             optimizer.zero_grad()
-            output = cnn(X_batch)
+            output = inception(X_batch)
             loss = criterion(output, Y_batch)
 
             loss.backward()
@@ -80,12 +81,12 @@ if __name__ == "__main__":
             train_loss.append(loss.item())
 
 
-        cnn.eval()
+        inception.eval()
         with torch.no_grad():
             for a, (X_batch, Y_batch) in enumerate(valloader):
                 X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
-                output = cnn(X_batch)
+                output = inception(X_batch)
                 loss = criterion(output, Y_batch)
 
                 # metrics
