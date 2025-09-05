@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import time
 import torchvision.transforms as transforms
 from torch.utils.data import random_split
@@ -36,18 +37,26 @@ if __name__ == "__main__":
     valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
 
-    cnn = PlainCNN(32, 3).to('cuda')
+    cnn = PlainCNN(3).to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-3, weight_decay=1e-3)
+    epoch_train_loss = []
+    epoch_val_loss = []
 
     for i in range(30):
+
+        train_prec = []
+        val_prec = []
+        train_loss = []
+        val_loss = []
 
         t1 = time.time()
         cnn.train()
 
         for a, (X_batch, Y_batch) in enumerate(trainloader):
             X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
             optimizer.zero_grad()
             output = cnn(X_batch)
             loss = criterion(output, Y_batch)
@@ -55,6 +64,38 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-        print(f"Epoch : {i}, Loss : {loss.item()}, Time : {time.time()-t1}")
+
+            # metrics
+            _, pred = torch.max(output, 1)
+            train_prec.append((pred == Y_batch).cpu().sum() / BATCH_SIZE)
+            train_loss.append(loss.item())
+
+
+        cnn.eval()
+        with torch.no_grad():
+            for a, (X_batch, Y_batch) in enumerate(valloader):
+                X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+                output = cnn(X_batch)
+                loss = criterion(output, Y_batch)
+
+                # metrics
+                _, pred = torch.max(output, 1)
+                val_prec.append((pred == Y_batch).cpu().sum() / BATCH_SIZE)
+                val_loss.append(loss.item())
+
+
+
+        print(f"""
+              Epoch : {i}
+
+                    Train Loss : {np.mean(train_loss)}
+                    Train prec : {np.mean(train_prec)}
+
+                    Val loss : {np.mean(val_loss)}
+                    Val prec : {np.mean(val_prec)}
+
+                    Time : {time.time()-t1}"
+              """)
 
 
