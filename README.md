@@ -384,3 +384,44 @@ En esta sesion implementamos:
 * Weight Decay
 * StepLRDecay
 
+
+# Session 2 (DataAugmentation)
+
+Implementando `DataAugmentation` ...
+
+```python
+
+...
+
+if __name__ == "__main__":
+
+    transform_train = transforms.Compose([
+        # data augmentation
+        transforms.RandomHorizontalFlip(),         # Volteo horizontal aleatorio
+        transforms.RandomRotation(15),             # Rotación aleatoria ±15°
+        transforms.RandomCrop(32, padding=4),      # Recorte aleatorio con padding
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # Variación de color
+        transforms.ToTensor(),                        
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    ])
+
+...
+```
+
+Alcanzamos los siguientes resultados:
+
+
+```
+              Epoch : 99
+
+                    Train Loss : 0.572
+                    Train prec : 0.801
+
+                    Val loss : 0.613
+                    Val prec : 0.790
+
+                    Time : 1.5642516613006592
+```
+
+
+![title](./images/Session2.png)

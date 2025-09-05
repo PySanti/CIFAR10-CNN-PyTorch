@@ -14,6 +14,10 @@ if __name__ == "__main__":
 
     transform_train = transforms.Compose([
         # data augmentation
+        transforms.RandomHorizontalFlip(),         # Volteo horizontal aleatorio
+        transforms.RandomRotation(15),             # Rotación aleatoria ±15°
+        transforms.RandomCrop(32, padding=4),      # Recorte aleatorio con padding
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # Variación de color
         transforms.ToTensor(),                        
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
     ])
