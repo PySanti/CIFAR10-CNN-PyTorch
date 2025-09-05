@@ -175,3 +175,212 @@ Resultado:
 3     967
 4     963
 ```
+
+# Primera prueba de entrenamiento
+
+Despues de bastante tiempo moviendo piezas en la construccion de la arquitectura y el proceso de entrenamiento, logramos alcanzar precisiones cercanas al 80% en validacion.
+
+Actualmente la arquitectura es la siguiente:
+
+![title](./images/Arquitecture1.jpg)
+
+Este es el codigo:
+
+```python
+
+# PlainCNN.py
+
+from torch import nn
+from utils.plain_cnn_block import plain_cnn_block
+
+
+class PlainCNN(nn.Module):
+    def __init__(self, in_channels=3):
+        super(PlainCNN, self).__init__()
+        self.conv_block1 = plain_cnn_block(in_channels,7,32,3,1, norm=True, pool=2, db=8)
+        self.conv_block2 = plain_cnn_block(32,5,64,2,1, norm=True, pool=2, db=4)
+        self.conv_block3 = plain_cnn_block(64,5,128,2,1, norm=True, pool=2, db=2)
+        self.conv_block4 = plain_cnn_block(128,3,256,1,1, norm=True, pool=2)
+        self.conv_block5 = plain_cnn_block(256,3,512,1,1, norm=True, pool=2)
+        self.linear_block = nn.Sequential(
+                nn.Linear(512, 2000),
+                nn.LeakyReLU(),
+                nn.Dropout(0.4),
+                nn.Linear(2000, 10)
+                )
+    def forward(self, x):
+        out = self.conv_block1(x)
+        out = self.conv_block2(out)
+        out = self.conv_block3(out)
+        out = self.conv_block4(out)
+        out = self.conv_block5(out).view(out.size(0), -1)
+        out = self.linear_block(out)
+        return out
+
+```
+
+```python
+
+# utils/plain_cnn_block.py
+
+
+from torch import nn
+from dropblock import DropBlock2D
+
+
+def plain_cnn_block(in_channels,kernel_size, out_channels, padding,stride=1, pool=False, norm=False, db=False):
+    layers = []
+    layers.append(nn.Conv2d(in_channels,out_channels, kernel_size,stride, padding))
+    if norm:
+        layers.append(nn.BatchNorm2d(out_channels))
+
+    layers.append(nn.ReLU(inplace=True))
+    if db:
+        layers.append(DropBlock2D(0.3, db))
+    if pool:
+        layers.append(nn.AvgPool2d(pool))
+
+    return nn.Sequential(*layers)
+```
+
+```python
+
+# main.py
+
+
+import torch
+import numpy as np
+import time
+import torchvision.transforms as transforms
+from torch.utils.data import random_split
+import torchvision.transforms as transforms
+from torchvision.datasets import CIFAR10
+from torch.utils.data import DataLoader
+from utils.MACROS import NUM_WORKERS, BATCH_SIZE
+from utils.PlainCNN import PlainCNN
+from utils.plot_performance import plot_performance
+
+if __name__ == "__main__":
+
+    transform_train = transforms.Compose([
+        # data augmentation
+        transforms.ToTensor(),                        
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    ])
+
+
+    trainset = CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    testset = CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+
+    train_size = int(0.8 * len(trainset))
+    val_size = len(trainset) - train_size
+
+    torch.manual_seed(42)
+    trainset, valset = random_split(trainset, [train_size, val_size])
+    valset.dataset.transform = transform_test
+
+    trainloader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, persistent_workers=True)
+    valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+    testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+
+    cnn = PlainCNN(3).to('cuda')
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-2, weight_decay=1e-4)
+    epoch_train_loss = []
+    epoch_val_loss = []
+
+    for i in range(100):
+
+        train_prec = []
+        val_prec = []
+        train_loss = []
+        val_loss = []
+
+        t1 = time.time()
+        cnn.train()
+
+        if (i+1)%15 == 0:
+            optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']*0.1
+            print(f"Valor actual del lr : {optimizer.param_groups[0]['lr']}")
+
+        for a, (X_batch, Y_batch) in enumerate(trainloader):
+            X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+            optimizer.zero_grad()
+            output = cnn(X_batch)
+            loss = criterion(output, Y_batch)
+
+            loss.backward()
+            optimizer.step()
+
+
+            # metrics
+            _, pred = torch.max(output, 1)
+            train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+            train_loss.append(loss.item())
+
+
+        cnn.eval()
+        with torch.no_grad():
+            for a, (X_batch, Y_batch) in enumerate(valloader):
+                X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+                output = cnn(X_batch)
+                loss = criterion(output, Y_batch)
+
+                # metrics
+                _, pred = torch.max(output, 1)
+                val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+                val_loss.append(loss.item())
+
+
+
+        print(f"""
+              Epoch : {i}
+
+                    Train Loss : {np.mean(train_loss):.3f}
+                    Train prec : {np.mean(train_prec):.3f}
+
+                    Val loss : {np.mean(val_loss):.3f}
+                    Val prec : {np.mean(val_prec):.3f}
+
+                    Time : {time.time()-t1}
+              """)
+        epoch_train_loss.append(np.mean(train_loss))
+        epoch_val_loss.append(np.mean(val_loss))    
+
+    plot_performance(epoch_train_loss, epoch_val_loss)
+```
+
+Estos fueron los resultados:
+
+
+```
+
+              Epoch : 99
+
+                    Train Loss : 0.574
+                    Train prec : 0.797
+
+                    Val loss : 0.620
+                    Val prec : 0.783
+
+                    Time : 1.5687966346740723
+```
+
+
+![title](./images/Session1.png)
+
+En esta sesion implementamos:
+
+* DropBlock
+* Dropout
+* Weight Decay
+* StepLRDecay
+

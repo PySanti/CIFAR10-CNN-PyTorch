@@ -8,6 +8,7 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from utils.MACROS import NUM_WORKERS, BATCH_SIZE
 from utils.PlainCNN import PlainCNN
+from utils.plot_performance import plot_performance
 
 if __name__ == "__main__":
 
@@ -40,11 +41,11 @@ if __name__ == "__main__":
     cnn = PlainCNN(3).to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(params=cnn.parameters(), lr=1e-2, weight_decay=1e-4)
     epoch_train_loss = []
     epoch_val_loss = []
 
-    for i in range(30):
+    for i in range(100):
 
         train_prec = []
         val_prec = []
@@ -53,6 +54,10 @@ if __name__ == "__main__":
 
         t1 = time.time()
         cnn.train()
+
+        if (i+1)%15 == 0:
+            optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']*0.1
+            print(f"Valor actual del lr : {optimizer.param_groups[0]['lr']}")
 
         for a, (X_batch, Y_batch) in enumerate(trainloader):
             X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
@@ -67,7 +72,7 @@ if __name__ == "__main__":
 
             # metrics
             _, pred = torch.max(output, 1)
-            train_prec.append((pred == Y_batch).cpu().sum() / BATCH_SIZE)
+            train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
             train_loss.append(loss.item())
 
 
@@ -81,7 +86,7 @@ if __name__ == "__main__":
 
                 # metrics
                 _, pred = torch.max(output, 1)
-                val_prec.append((pred == Y_batch).cpu().sum() / BATCH_SIZE)
+                val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
                 val_loss.append(loss.item())
 
 
@@ -89,13 +94,15 @@ if __name__ == "__main__":
         print(f"""
               Epoch : {i}
 
-                    Train Loss : {np.mean(train_loss)}
-                    Train prec : {np.mean(train_prec)}
+                    Train Loss : {np.mean(train_loss):.3f}
+                    Train prec : {np.mean(train_prec):.3f}
 
-                    Val loss : {np.mean(val_loss)}
-                    Val prec : {np.mean(val_prec)}
+                    Val loss : {np.mean(val_loss):.3f}
+                    Val prec : {np.mean(val_prec):.3f}
 
-                    Time : {time.time()-t1}"
+                    Time : {time.time()-t1}
               """)
+        epoch_train_loss.append(np.mean(train_loss))
+        epoch_val_loss.append(np.mean(val_loss))
 
-
+    plot_performance(epoch_train_loss, epoch_val_loss)
