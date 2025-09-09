@@ -430,4 +430,278 @@ Alcanzamos los siguientes resultados:
 
 Despues de bastante tiempo ajustando la arquitectura de la red, logramos una version muy similar a la del paper de GoogLeNet, utilizando el siguiente codigo:
 
+```python
 
+# utils/InceptionNet
+
+import torch
+from utils.AuxiliaryClassifier import AuxiliaryClassifier
+from torch import nn
+from utils.InceptionBlock import InceptionBlock
+from utils.plain_cnn_block import plain_cnn_block # Revisa si aún necesitas este bloque
+
+class InceptionNet(nn.Module):
+    def __init__(self, num_classes=10):
+        super(InceptionNet, self).__init__()
+        
+        self.conv_initial = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.BatchNorm2d(192),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        )
+        
+        self.inception3a = InceptionBlock(192, 64, 96, 128, 16, 32, 32)
+        self.inception3b = InceptionBlock(256, 128, 128, 192, 32, 96, 64)
+        
+        self.aux1 = AuxiliaryClassifier(in_channels=480, num_classes=num_classes)
+        
+        self.maxpool4 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.inception4a = InceptionBlock(480, 192, 96, 208, 16, 48, 64)
+        self.inception4b = InceptionBlock(512, 160, 112, 224, 24, 64, 64)
+        self.inception4c = InceptionBlock(512, 128, 128, 256, 24, 64, 64)
+        self.inception4d = InceptionBlock(512, 112, 144, 288, 32, 64, 64)
+        
+        self.aux2 = AuxiliaryClassifier(in_channels=528, num_classes=num_classes)
+        
+        self.inception4e = InceptionBlock(528, 256, 160, 320, 32, 128, 128)
+        self.maxpool5 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.inception5a = InceptionBlock(832, 256, 160, 320, 32, 128, 128)
+        self.inception5b = InceptionBlock(832, 384, 192, 384, 48, 128, 128)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(p=0.4)
+        self.fc = nn.Linear(1024, num_classes) # 1024 es el número de canales de salida del último InceptionBlock 5b
+    
+    def forward(self, x):
+        x = self.conv_initial(x)
+        
+        x = self.inception3a(x)
+        x = self.inception3b(x)
+        aux1 = self.aux1(x) # Salida auxiliar 1
+        
+        x = self.maxpool4(x)
+        x = self.inception4a(x)
+        x = self.inception4b(x)
+        x = self.inception4c(x)
+        x = self.inception4d(x)
+        aux2 = self.aux2(x) # Salida auxiliar 2
+        
+        x = self.inception4e(x)
+        x = self.maxpool5(x)
+        x = self.inception5a(x)
+        x = self.inception5b(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x)
+        x = self.fc(x)
+        
+        return x, aux1, aux2
+
+```
+
+```python
+
+# utils/InceptionBlock.py
+
+from torch import nn
+import torch
+
+class InceptionBlock(nn.Module):
+    def __init__(self,  in_channels, out_1x1, red_3x3, out_3x3, red_5x5, out_5x5, pool_proj):
+        super(InceptionBlock, self).__init__()
+        self.branch1 = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels=out_1x1, kernel_size=1, padding=0, stride=1)
+                )
+        self.branch2 = nn.Sequential(
+                nn.Conv2d(in_channels, red_3x3, kernel_size=1, padding=0, stride=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(red_3x3),
+                nn.Conv2d(red_3x3, out_3x3, kernel_size=3, padding=1, stride=1),
+                nn.BatchNorm2d(out_3x3),
+                nn.ReLU()
+                )
+        self.branch3 = nn.Sequential(
+                nn.Conv2d(in_channels, red_5x5, kernel_size=1, padding=0, stride=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(red_5x5),
+                nn.Conv2d(red_5x5, out_5x5, kernel_size=5, padding=2, stride=1),
+                nn.BatchNorm2d(out_5x5),
+                nn.ReLU()
+                )
+        self.branch4 = nn.Sequential(
+                nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(in_channels),
+                nn.Conv2d(in_channels, pool_proj, kernel_size=1, padding=0, stride=1),
+                nn.BatchNorm2d(pool_proj),
+                nn.ReLU()
+                )
+
+    def forward(self, X):
+        conv1 = self.branch1(X)
+        conv2 = self.branch2(X)
+        conv3 = self.branch3(X)
+        conv4 = self.branch4(X)
+        return torch.cat([conv1, conv2, conv3, conv4], dim=1)
+
+```
+
+```python
+
+# utils/AuxiliaryClassifier.py
+
+
+import torch.nn as nn
+
+class AuxiliaryClassifier(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super(AuxiliaryClassifier, self).__init__()
+        self.auxiliary = nn.Sequential(
+            nn.AvgPool2d(kernel_size=1, stride=1), 
+            nn.Conv2d(in_channels, 128, kernel_size=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d((1,1)),
+        )
+        self.linear = nn.Sequential(
+            nn.Linear(128, 1024),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.6),
+            nn.Linear(1024, num_classes)
+                )
+
+    def forward(self, x):
+        x = self.auxiliary(x)
+        x = x.view(x.size(0), -1)
+        return self.linear(x)
+```
+
+```python
+
+# utils/main.py
+
+import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import numpy as np
+import time
+import torchvision.transforms as transforms
+from torch.utils.data import random_split
+import torchvision.transforms as transforms
+from torchvision.datasets import CIFAR10
+from torch.utils.data import DataLoader
+from utils.MACROS import NUM_WORKERS, BATCH_SIZE
+from utils.PlainCNN import PlainCNN
+from utils.InceptionNet import InceptionNet
+from utils.plot_performance import plot_performance
+
+if __name__ == "__main__":
+
+    transform_train = transforms.Compose([
+        # data augmentation
+        transforms.RandomHorizontalFlip(),         # Volteo horizontal aleatorio
+        transforms.RandomRotation(15),             # Rotación aleatoria ±15°
+        transforms.RandomCrop(32, padding=4),      # Recorte aleatorio con padding
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # Variación de color
+        transforms.ToTensor(),                        
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    ])
+
+
+    trainset = CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    testset = CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+
+    train_size = int(0.8 * len(trainset))
+    val_size = len(trainset) - train_size
+
+    torch.manual_seed(42)
+    trainset, valset = random_split(trainset, [train_size, val_size])
+    valset.dataset.transform = transform_test
+
+    trainloader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, persistent_workers=True)
+    valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+    testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+
+    inception = InceptionNet().to('cuda')
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(params=inception.parameters(), lr=1e-3, weight_decay=1e-3)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+    epoch_train_loss = []
+    epoch_val_loss = []
+
+    for i in range(100):
+
+        train_prec = []
+        val_prec = []
+        train_loss = []
+        val_loss = []
+
+        t1 = time.time()
+        inception.train()
+
+        for a, (X_batch, Y_batch) in enumerate(trainloader):
+            X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+            optimizer.zero_grad()
+            output, aux1, aux2 = inception(X_batch)
+            loss = criterion(output, Y_batch)
+            aux_loss1 = criterion(aux1, Y_batch)
+            aux_loss2 = criterion(aux2, Y_batch)
+
+            total_loss = loss + 0.3 * aux_loss1 + 0.3 * aux_loss2
+
+            total_loss.backward()
+            optimizer.step()
+
+            # metrics
+            _, pred = torch.max(output, 1)
+            train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+            train_loss.append(total_loss.item())
+
+
+        inception.eval()
+        with torch.no_grad():
+            for a, (X_batch, Y_batch) in enumerate(valloader):
+                X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+                output,_, _ = inception(X_batch)
+                loss = criterion(output, Y_batch)
+
+                # metrics
+                _, pred = torch.max(output, 1)
+                val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+                val_loss.append(loss.item())
+
+        scheduler.step(np.mean(val_loss))
+        
+
+
+
+        print(f"""
+              Epoch : {i+1}
+
+                    Train Loss : {np.mean(train_loss):.3f}
+                    Train prec : {np.mean(train_prec):.3f}
+
+                    Val loss : {np.mean(val_loss):.3f}
+                    Val prec : {np.mean(val_prec):.3f}
+
+                    Time : {time.time()-t1}
+              """)
+        epoch_train_loss.append(np.mean(train_loss))
+        epoch_val_loss.append(np.mean(val_loss))
+
+    plot_performance(epoch_train_loss, epoch_val_loss)
+```
