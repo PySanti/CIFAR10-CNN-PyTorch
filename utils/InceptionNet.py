@@ -1,36 +1,75 @@
+import torch
+from utils.AuxiliaryClassifier import AuxiliaryClassifier
 from torch import nn
 from utils.InceptionBlock import InceptionBlock
-from dropblock import DropBlock2D
+from utils.plain_cnn_block import plain_cnn_block # Revisa si aún necesitas este bloque
 
-
+# Suponiendo que has corregido tu clase InceptionBlock como se discutió anteriormente
 class InceptionNet(nn.Module):
-    def __init__(self, channels=3):
+    def __init__(self, num_classes=10):
         super(InceptionNet, self).__init__()
-        self.conv_layers = nn.Sequential(
-                InceptionBlock(in_channels=3, out_channels=16, channel_filter_size=16),
-                nn.AvgPool2d(2),
-                DropBlock2D(0.3, 4),
-                InceptionBlock(in_channels=16*4, out_channels=32, channel_filter_size=32),
-                nn.AvgPool2d(2),
-                DropBlock2D(0.3, 2),
-                InceptionBlock(in_channels=32*4, out_channels=64, channel_filter_size=64),
-                nn.AvgPool2d(2),
-                DropBlock2D(0.3, 1),
-                InceptionBlock(in_channels=64*4, out_channels=128, channel_filter_size=128),
-                )
-        self.linear_layers = nn.Sequential(
-                nn.Linear(128*4, 1000),
-                nn.ReLU(),
-                nn.Dropout(0.35),
-                nn.Linear(1000, 10)
-                )
-        self.pool = nn.AvgPool2d(kernel_size=4)
-
+        
+        # Etapa inicial de la red
+        self.conv_initial = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.BatchNorm2d(192),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        )
+        
+        # Módulos Inception con las dimensiones correctas de GoogLeNet
+        self.inception3a = InceptionBlock(192, 64, 96, 128, 16, 32, 32)
+        self.inception3b = InceptionBlock(256, 128, 128, 192, 32, 96, 64)
+        
+        # Primer clasificador auxiliar después de InceptionBlock 3b
+        self.aux1 = AuxiliaryClassifier(in_channels=480, num_classes=num_classes)
+        
+        self.maxpool4 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.inception4a = InceptionBlock(480, 192, 96, 208, 16, 48, 64)
+        self.inception4b = InceptionBlock(512, 160, 112, 224, 24, 64, 64)
+        self.inception4c = InceptionBlock(512, 128, 128, 256, 24, 64, 64)
+        self.inception4d = InceptionBlock(512, 112, 144, 288, 32, 64, 64)
+        
+        # Segundo clasificador auxiliar después de InceptionBlock 4d
+        self.aux2 = AuxiliaryClassifier(in_channels=528, num_classes=num_classes)
+        
+        self.inception4e = InceptionBlock(528, 256, 160, 320, 32, 128, 128)
+        self.maxpool5 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.inception5a = InceptionBlock(832, 256, 160, 320, 32, 128, 128)
+        self.inception5b = InceptionBlock(832, 384, 192, 384, 48, 128, 128)
+        
+        # Capa de clasificación final
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(p=0.4)
+        self.fc = nn.Linear(1024, num_classes) # 1024 es el número de canales de salida del último InceptionBlock 5b
+    
     def forward(self, x):
-        out = self.conv_layers(x)
-        out = self.pool(out).view(out.size(0), -1)
-        out = self.linear_layers(out)
-        return out
-
-    def _init_weights(self):
-        pass
+        x = self.conv_initial(x)
+        
+        x = self.inception3a(x)
+        x = self.inception3b(x)
+        aux1 = self.aux1(x) # Salida auxiliar 1
+        
+        x = self.maxpool4(x)
+        x = self.inception4a(x)
+        x = self.inception4b(x)
+        x = self.inception4c(x)
+        x = self.inception4d(x)
+        aux2 = self.aux2(x) # Salida auxiliar 2
+        
+        x = self.inception4e(x)
+        x = self.maxpool5(x)
+        x = self.inception5a(x)
+        x = self.inception5b(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x)
+        x = self.fc(x)
+        
+        return x, aux1, aux2

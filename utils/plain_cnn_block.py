@@ -12,6 +12,6 @@ def plain_cnn_block(in_channels,kernel_size, out_channels, padding,stride=1, poo
     if db:
         layers.append(DropBlock2D(0.3, db))
     if pool:
-        layers.append(nn.AvgPool2d(pool))
+        layers.append(nn.MaxPool2d(pool))
 
     return nn.Sequential(*layers)

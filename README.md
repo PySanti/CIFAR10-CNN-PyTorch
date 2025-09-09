@@ -385,7 +385,7 @@ En esta sesion implementamos:
 * StepLRDecay
 
 
-# Session 2 (DataAugmentation)
+# Segunda prueba de entrenamiento (DataAugmentation)
 
 Implementando `DataAugmentation` ...
 
@@ -425,3 +425,9 @@ Alcanzamos los siguientes resultados:
 
 
 ![title](./images/Session2.png)
+
+# Tercera prueba de entrenamiento (implementacion de GoogLeNet)
+
+Despues de bastante tiempo ajustando la arquitectura de la red, logramos una version muy similar a la del paper de GoogLeNet, utilizando el siguiente codigo:
+
+

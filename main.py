@@ -1,4 +1,5 @@
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 import time
 import torchvision.transforms as transforms
@@ -43,10 +44,11 @@ if __name__ == "__main__":
     valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
 
-    inception = InceptionNet(3).to('cuda')
+    inception = InceptionNet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=inception.parameters(), lr=1e-3, weight_decay=1e-4)
+    optimizer = torch.optim.SGD(params=inception.parameters(), lr=1e-3, weight_decay=1e-3)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []
 
@@ -60,25 +62,24 @@ if __name__ == "__main__":
         t1 = time.time()
         inception.train()
 
-        if (i+1)%20 == 0:
-            optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']*0.1
-            print(f"Valor actual del lr : {optimizer.param_groups[0]['lr']}")
-
         for a, (X_batch, Y_batch) in enumerate(trainloader):
             X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
             optimizer.zero_grad()
-            output = inception(X_batch)
+            output, aux1, aux2 = inception(X_batch)
             loss = criterion(output, Y_batch)
+            aux_loss1 = criterion(aux1, Y_batch)
+            aux_loss2 = criterion(aux2, Y_batch)
 
-            loss.backward()
+            total_loss = loss + 0.3 * aux_loss1 + 0.3 * aux_loss2
+
+            total_loss.backward()
             optimizer.step()
-
 
             # metrics
             _, pred = torch.max(output, 1)
             train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
-            train_loss.append(loss.item())
+            train_loss.append(total_loss.item())
 
 
         inception.eval()
@@ -86,7 +87,7 @@ if __name__ == "__main__":
             for a, (X_batch, Y_batch) in enumerate(valloader):
                 X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
-                output = inception(X_batch)
+                output,_, _ = inception(X_batch)
                 loss = criterion(output, Y_batch)
 
                 # metrics
@@ -94,10 +95,13 @@ if __name__ == "__main__":
                 val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
                 val_loss.append(loss.item())
 
+        scheduler.step(np.mean(val_loss))
+        
+
 
 
         print(f"""
-              Epoch : {i}
+              Epoch : {i+1}
 
                     Train Loss : {np.mean(train_loss):.3f}
                     Train prec : {np.mean(train_prec):.3f}
