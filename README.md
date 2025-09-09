@@ -182,7 +182,7 @@ Despues de bastante tiempo moviendo piezas en la construccion de la arquitectura
 
 Actualmente la arquitectura es la siguiente:
 
-![title](./images/Arquitecture1.jpg)
+![title](./images/arquitecture1.jpg)
 
 Este es el codigo:
 
