@@ -375,7 +375,7 @@ Estos fueron los resultados:
 ```
 
 
-![title](./images/Session1.png)
+![title](./images/session1.png)
 
 En esta sesion implementamos:
 
@@ -424,7 +424,7 @@ Alcanzamos los siguientes resultados:
 ```
 
 
-![title](./images/Session2.png)
+![title](./images/session2.png)
 
 # Tercera prueba de entrenamiento (implementacion de GoogLeNet)
 
@@ -740,7 +740,7 @@ Se alcanzaron los siguientes resultados:
                     Time : 5.9890525341033936
 ```
 
-![title](./images/Session3.jpg)
+![title](./images/session3.jpg)
 
 Mi analisis de la situacion es que la red es demasiado profunda para la complejidad del problema, eso ocasiona un overfitting muy dificil de manejar.
 
