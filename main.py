@@ -15,18 +15,18 @@ from utils.plot_performance import plot_performance
 if __name__ == "__main__":
 
     transform_train = transforms.Compose([
-        # data augmentation
-        transforms.RandomHorizontalFlip(),         # Volteo horizontal aleatorio
-        transforms.RandomRotation(15),             # Rotación aleatoria ±15°
-        transforms.RandomCrop(32, padding=4),      # Recorte aleatorio con padding
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # Variación de color
-        transforms.ToTensor(),                        
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]),
+        transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3)) 
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
     ])
 
 
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     inception = InceptionNet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=inception.parameters(), lr=1e-4, weight_decay=1e-4)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+    optimizer = torch.optim.SGD(params=inception.parameters(), lr=0.001, weight_decay=5e-4, momentum=0.9)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
                 val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
                 val_loss.append(loss.item())
 
-        scheduler.step(np.mean(val_loss))
+        scheduler.step(np.mean(val_prec))
         
 
 

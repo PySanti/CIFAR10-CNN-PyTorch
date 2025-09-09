@@ -14,7 +14,7 @@ class AuxiliaryClassifier(nn.Module):
         self.linear = nn.Sequential(
             nn.Linear(128, 1024),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.6),
+            nn.Dropout(p=0.7),
             nn.Linear(1024, num_classes)
                 )
 

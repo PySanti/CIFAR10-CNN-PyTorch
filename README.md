@@ -715,3 +715,31 @@ Estos son los resultados:
 ```
 
 El entrenamiento se estanca. Al ser una arquitectura tan profunda, el overfitting es dificil de controlar.
+
+
+# Session 4 (intento de mejora de precisiones)
+
+Luego de utilizar las siguientes tecnicas:
+
+* Adam -> SGD with momentum
+* Cambios en normalizacion y data augmentation
+* DropBlock
+* Batch size 512 -> 128
+
+Se alcanzaron los siguientes resultados:
+
+```
+              Epoch : 100
+
+                    Train Loss : 0.255
+                    Train prec : 0.926
+
+                    Val loss : 1.333
+                    Val prec : 0.707
+
+                    Time : 5.9890525341033936
+```
+
+![title](./images/Session3.jpg)
+
+Mi analisis de la situacion es que la red es demasiado profunda para la complejidad del problema, eso ocasiona un overfitting muy dificil de manejar.
