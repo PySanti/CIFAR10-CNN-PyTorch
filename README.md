@@ -740,7 +740,7 @@ Se alcanzaron los siguientes resultados:
                     Time : 5.9890525341033936
 ```
 
-![title](./images/session3.jpg)
+![title](./images/session3.png)
 
 Mi analisis de la situacion es que la red es demasiado profunda para la complejidad del problema, eso ocasiona un overfitting muy dificil de manejar.
 
