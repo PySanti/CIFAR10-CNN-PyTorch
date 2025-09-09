@@ -743,3 +743,215 @@ Se alcanzaron los siguientes resultados:
 ![title](./images/Session3.jpg)
 
 Mi analisis de la situacion es que la red es demasiado profunda para la complejidad del problema, eso ocasiona un overfitting muy dificil de manejar.
+
+# Session 4 (Implementacion de SqueezeExciteNet)
+
+Utilizando el siguiente codigo:
+
+
+```python
+
+# utils/SEBlock.py
+
+from typing import final
+from torch import nn
+
+
+class SEBlock(nn.Module):
+    def __init__(self, out_channels) -> None:
+        super(SEBlock, self).__init__()
+        self.linear_layer = nn.Sequential(
+                nn.AdaptiveAvgPool2d((1,1)),
+                nn.Flatten(),
+                nn.Linear(out_channels, 1000),
+                nn.ReLU(),
+                nn.Linear(1000, out_channels),
+                nn.Sigmoid()
+                )
+    
+    def forward(self, x):
+        linear_out = self.linear_layer(x) #  -> [B, out_channels]
+        linear_out = linear_out.unsqueeze(-1).unsqueeze(-1)
+        return x*linear_out
+
+```
+
+```python
+# utils/SENet.py
+
+from torch import nn
+
+from utils.SEBlock import SEBlock
+
+
+class SENet(nn.Module):
+    def __init__(self) -> None:
+        super(SENet, self).__init__()
+        self.se_blocks = nn.Sequential(
+            nn.Conv2d(3, 64, 7, 1, 3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            SEBlock(64),
+            nn.Conv2d(64, 108, 5, 1, 2),
+            nn.BatchNorm2d(108),
+            nn.ReLU(),
+            SEBlock(108),
+            nn.Conv2d(108, 186, 5, 1, 2),
+            nn.BatchNorm2d(186),
+            nn.ReLU(),
+            SEBlock(186),
+            nn.Conv2d(186, 230, 3, 1, 1),
+            nn.BatchNorm2d(230),
+            nn.ReLU(),
+            SEBlock(230),
+            nn.Conv2d(230, 300, 3, 1, 1),
+            nn.BatchNorm2d(300),
+            nn.ReLU(),
+                )
+        self.pool = nn.AdaptiveAvgPool2d((1,1))
+        self.linear_layers = nn.Sequential(
+                nn.Linear(300, 10)
+                )
+    def forward(self, x):
+        out = self.se_blocks(x)
+        out = self.pool(out)
+        out = out.view(out.size(0), -1)
+        return self.linear_layers(out)
+```
+
+```python
+
+import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import numpy as np
+import time
+import torchvision.transforms as transforms
+from torch.utils.data import random_split
+import torchvision.transforms as transforms
+from torchvision.datasets import CIFAR10
+from torch.utils.data import DataLoader
+from utils.MACROS import NUM_WORKERS, BATCH_SIZE
+from utils.PlainCNN import PlainCNN
+from utils.SENet import SENet
+from utils.plot_performance import plot_performance
+
+if __name__ == "__main__":
+
+    transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]),
+        transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3)) 
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
+    ])
+
+
+    trainset = CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    testset = CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+
+    train_size = int(0.8 * len(trainset))
+    val_size = len(trainset) - train_size
+
+    torch.manual_seed(42)
+    trainset, valset = random_split(trainset, [train_size, val_size])
+    valset.dataset.transform = transform_test
+
+    trainloader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, persistent_workers=True)
+    valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+    testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
+
+    se_net = SENet().to('cuda')
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(params=se_net.parameters(), lr=0.001, weight_decay=5e-4, momentum=0.9)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=10)
+    epoch_train_loss = []
+    epoch_val_loss = []
+
+    for i in range(100):
+
+        train_prec = []
+        val_prec = []
+        train_loss = []
+        val_loss = []
+
+        t1 = time.time()
+        se_net.train()
+
+        for a, (X_batch, Y_batch) in enumerate(trainloader):
+            X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+            optimizer.zero_grad()
+            output = se_net(X_batch)
+            loss = criterion(output, Y_batch)
+
+            loss.backward()
+            optimizer.step()
+
+            # metrics
+            _, pred = torch.max(output, 1)
+            train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+            train_loss.append(loss.item())
+
+
+        se_net.eval()
+        with torch.no_grad():
+            for a, (X_batch, Y_batch) in enumerate(valloader):
+                X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
+
+                output = se_net(X_batch)
+                loss = criterion(output, Y_batch)
+
+                # metrics
+                _, pred = torch.max(output, 1)
+                val_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
+                val_loss.append(loss.item())
+
+        scheduler.step(np.mean(val_prec))
+        
+
+
+
+        print(f"""
+              Epoch : {i+1}
+
+                    Train Loss : {np.mean(train_loss):.3f}
+                    Train prec : {np.mean(train_prec):.3f}
+
+                    Val loss : {np.mean(val_loss):.3f}
+                    Val prec : {np.mean(val_prec):.3f}
+
+                    Time : {time.time()-t1}
+              """)
+        epoch_train_loss.append(np.mean(train_loss))
+        epoch_val_loss.append(np.mean(val_loss))
+
+    plot_performance(epoch_train_loss, epoch_val_loss)
+```
+
+Se obtuvieron los siguientes resultados:
+
+```
+              Epoch : 100
+
+                    Train Loss : 0.060
+                    Train prec : 0.996
+
+                    Val loss : 0.473
+                    Val prec : 0.846
+
+                    Time : 23.089218378067017
+```
+
+![title](./images/session4.png)
+
+Se comporta mucho mejor que GoogLeNet, pero mucho mas lento, se implementaran tecnicas de regularizacion.
+
+

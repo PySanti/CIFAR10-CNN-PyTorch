@@ -9,7 +9,7 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from utils.MACROS import NUM_WORKERS, BATCH_SIZE
 from utils.PlainCNN import PlainCNN
-from utils.InceptionNet import InceptionNet
+from utils.SENet import SENet
 from utils.plot_performance import plot_performance
 
 if __name__ == "__main__":
@@ -44,10 +44,10 @@ if __name__ == "__main__":
     valloader = DataLoader(valset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, persistent_workers=True)
 
-    inception = InceptionNet().to('cuda')
+    se_net = SENet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(params=inception.parameters(), lr=0.001, weight_decay=5e-4, momentum=0.9)
+    optimizer = torch.optim.SGD(params=se_net.parameters(), lr=0.001, weight_decay=5e-4, momentum=0.9)
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []
@@ -60,34 +60,30 @@ if __name__ == "__main__":
         val_loss = []
 
         t1 = time.time()
-        inception.train()
+        se_net.train()
 
         for a, (X_batch, Y_batch) in enumerate(trainloader):
             X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
             optimizer.zero_grad()
-            output, aux1, aux2 = inception(X_batch)
+            output = se_net(X_batch)
             loss = criterion(output, Y_batch)
-            aux_loss1 = criterion(aux1, Y_batch)
-            aux_loss2 = criterion(aux2, Y_batch)
 
-            total_loss = loss + 0.3 * aux_loss1 + 0.3 * aux_loss2
-
-            total_loss.backward()
+            loss.backward()
             optimizer.step()
 
             # metrics
             _, pred = torch.max(output, 1)
             train_prec.append((pred == Y_batch).cpu().sum() / len(X_batch))
-            train_loss.append(total_loss.item())
+            train_loss.append(loss.item())
 
 
-        inception.eval()
+        se_net.eval()
         with torch.no_grad():
             for a, (X_batch, Y_batch) in enumerate(valloader):
                 X_batch, Y_batch = X_batch.to('cuda'), Y_batch.to('cuda')
 
-                output,_, _ = inception(X_batch)
+                output = se_net(X_batch)
                 loss = criterion(output, Y_batch)
 
                 # metrics
