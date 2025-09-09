@@ -432,13 +432,12 @@ Despues de bastante tiempo ajustando la arquitectura de la red, logramos una ver
 
 ```python
 
-# utils/InceptionNet
+# utils/InceptionNet.py
 
 import torch
 from utils.AuxiliaryClassifier import AuxiliaryClassifier
 from torch import nn
 from utils.InceptionBlock import InceptionBlock
-from utils.plain_cnn_block import plain_cnn_block # Revisa si aún necesitas este bloque
 
 class InceptionNet(nn.Module):
     def __init__(self, num_classes=10):
@@ -484,14 +483,14 @@ class InceptionNet(nn.Module):
         
         x = self.inception3a(x)
         x = self.inception3b(x)
-        aux1 = self.aux1(x) # Salida auxiliar 1
+        aux1 = self.aux1(x) 
         
         x = self.maxpool4(x)
         x = self.inception4a(x)
         x = self.inception4b(x)
         x = self.inception4c(x)
         x = self.inception4d(x)
-        aux2 = self.aux2(x) # Salida auxiliar 2
+        aux2 = self.aux2(x) 
         
         x = self.inception4e(x)
         x = self.maxpool5(x)
@@ -504,14 +503,12 @@ class InceptionNet(nn.Module):
         
         return x, aux1, aux2
 
-```
-
-```python
 
 # utils/InceptionBlock.py
 
 from torch import nn
 import torch
+from dropblock import DropBlock2D
 
 class InceptionBlock(nn.Module):
     def __init__(self,  in_channels, out_1x1, red_3x3, out_3x3, red_5x5, out_5x5, pool_proj):
@@ -543,26 +540,24 @@ class InceptionBlock(nn.Module):
                 nn.BatchNorm2d(pool_proj),
                 nn.ReLU()
                 )
+#        self.drop_block = nn.Dropout2d()
 
     def forward(self, X):
         conv1 = self.branch1(X)
         conv2 = self.branch2(X)
         conv3 = self.branch3(X)
         conv4 = self.branch4(X)
-        return torch.cat([conv1, conv2, conv3, conv4], dim=1)
-
-```
-
-```python
+        concat = torch.cat([conv1, conv2, conv3, conv4], dim=1)
+        return concat
 
 # utils/AuxiliaryClassifier.py
-
 
 import torch.nn as nn
 
 class AuxiliaryClassifier(nn.Module):
     def __init__(self, in_channels, num_classes):
         super(AuxiliaryClassifier, self).__init__()
+        # Capas del clasificador auxiliar basadas en la arquitectura original de GoogLeNet
         self.auxiliary = nn.Sequential(
             nn.AvgPool2d(kernel_size=1, stride=1), 
             nn.Conv2d(in_channels, 128, kernel_size=1),
@@ -581,11 +576,9 @@ class AuxiliaryClassifier(nn.Module):
         x = self.auxiliary(x)
         x = x.view(x.size(0), -1)
         return self.linear(x)
-```
 
-```python
 
-# utils/main.py
+# main.py
 
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -636,7 +629,7 @@ if __name__ == "__main__":
     inception = InceptionNet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(params=inception.parameters(), lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(params=inception.parameters(), lr=1e-4, weight_decay=1e-4)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []
@@ -705,3 +698,20 @@ if __name__ == "__main__":
 
     plot_performance(epoch_train_loss, epoch_val_loss)
 ```
+
+
+Estos son los resultados:
+
+```
+              Epoch : 24
+
+                    Train Loss : 0.341
+                    Train prec : 0.999
+
+                    Val loss : 2.135
+                    Val prec : 0.548
+
+                    Time : 2.8497347831726074
+```
+
+El entrenamiento se estanca. Al ser una arquitectura tan profunda, el overfitting es dificil de controlar.

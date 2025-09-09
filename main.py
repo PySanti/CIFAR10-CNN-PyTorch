@@ -47,7 +47,7 @@ if __name__ == "__main__":
     inception = InceptionNet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(params=inception.parameters(), lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(params=inception.parameters(), lr=1e-4, weight_decay=1e-4)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []

@@ -1,6 +1,6 @@
-from numpy import outer
 from torch import nn
 import torch
+from dropblock import DropBlock2D
 
 class InceptionBlock(nn.Module):
     def __init__(self,  in_channels, out_1x1, red_3x3, out_3x3, red_5x5, out_5x5, pool_proj):
@@ -32,14 +32,13 @@ class InceptionBlock(nn.Module):
                 nn.BatchNorm2d(pool_proj),
                 nn.ReLU()
                 )
+#        self.drop_block = nn.Dropout2d()
 
     def forward(self, X):
         conv1 = self.branch1(X)
         conv2 = self.branch2(X)
         conv3 = self.branch3(X)
         conv4 = self.branch4(X)
-        return torch.cat([conv1, conv2, conv3, conv4], dim=1)
-
-
-
+        concat = torch.cat([conv1, conv2, conv3, conv4], dim=1)
+        return concat
 
