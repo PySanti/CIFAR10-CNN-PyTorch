@@ -375,7 +375,7 @@ Estos fueron los resultados:
 ```
 
 
-![title](./images/Session1.png)
+![title](./images/session1.png)
 
 En esta sesion implementamos:
 
@@ -424,7 +424,7 @@ Alcanzamos los siguientes resultados:
 ```
 
 
-![title](./images/Session2.png)
+![title](./images/session2.png)
 
 # Tercera prueba de entrenamiento (implementacion de GoogLeNet)
 
