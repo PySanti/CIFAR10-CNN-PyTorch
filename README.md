@@ -176,7 +176,7 @@ Resultado:
 4     963
 ```
 
-# Primera prueba de entrenamiento
+# Session 1: Primera prueba de entrenamiento
 
 Despues de bastante tiempo moviendo piezas en la construccion de la arquitectura y el proceso de entrenamiento, logramos alcanzar precisiones cercanas al 80% en validacion.
 
@@ -385,7 +385,7 @@ En esta sesion implementamos:
 * StepLRDecay
 
 
-# Segunda prueba de entrenamiento (DataAugmentation)
+# Session 2 : DataAugmentation
 
 Implementando `DataAugmentation` ...
 
@@ -426,7 +426,7 @@ Alcanzamos los siguientes resultados:
 
 ![title](./images/session2.png)
 
-# Tercera prueba de entrenamiento (implementacion de GoogLeNet)
+# Session 3: Implementacion de GoogLeNet
 
 Despues de bastante tiempo ajustando la arquitectura de la red, logramos una version muy similar a la del paper de GoogLeNet, utilizando el siguiente codigo:
 
@@ -717,7 +717,7 @@ Estos son los resultados:
 El entrenamiento se estanca. Al ser una arquitectura tan profunda, el overfitting es dificil de controlar.
 
 
-# Session 4 (intento de mejora de precisiones)
+# Session 4: Intento de mejora de precisiones
 
 Luego de utilizar las siguientes tecnicas:
 
@@ -744,7 +744,7 @@ Se alcanzaron los siguientes resultados:
 
 Mi analisis de la situacion es que la red es demasiado profunda para la complejidad del problema, eso ocasiona un overfitting muy dificil de manejar.
 
-# Session 4 (Implementacion de SqueezeExciteNet)
+# Session 5: Implementacion de SqueezeExciteNet
 
 Utilizando el siguiente codigo:
 
@@ -954,7 +954,7 @@ Se obtuvieron los siguientes resultados:
 
 Se comporta mucho mejor que GoogLeNet, pero mucho mas lento, se implementaran tecnicas de regularizacion.
 
-# Session 5 (Mejora de SENet)
+# Session 6: Mejora de SENet
 
 Se realizaron los siguientes cambios:
 
