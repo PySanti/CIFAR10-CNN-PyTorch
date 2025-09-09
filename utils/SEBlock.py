@@ -3,14 +3,14 @@ from torch import nn
 
 
 class SEBlock(nn.Module):
-    def __init__(self, out_channels) -> None:
+    def __init__(self, out_channels, reduction) -> None:
         super(SEBlock, self).__init__()
         self.linear_layer = nn.Sequential(
                 nn.AdaptiveAvgPool2d((1,1)),
                 nn.Flatten(),
-                nn.Linear(out_channels, 500),
+                nn.Linear(out_channels, int(out_channels // reduction)),
                 nn.ReLU(),
-                nn.Linear(500, out_channels),
+                nn.Linear(int(out_channels // reduction), out_channels),
                 nn.Sigmoid()
                 )
     

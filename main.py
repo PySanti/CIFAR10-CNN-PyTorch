@@ -47,12 +47,12 @@ if __name__ == "__main__":
     se_net = SENet().to('cuda')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(params=se_net.parameters(), lr=0.001, weight_decay=5e-4, momentum=0.9)
+    optimizer = torch.optim.Adam(params=se_net.parameters(), lr=0.001, weight_decay=5e-4)
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=10)
     epoch_train_loss = []
     epoch_val_loss = []
 
-    for i in range(100):
+    for i in range(300):
 
         train_prec = []
         val_prec = []
